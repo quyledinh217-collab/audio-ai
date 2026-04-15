@@ -4,7 +4,10 @@ import joblib
 import os
 import librosa
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=os.path.join(os.path.dirname(__file__), 'templates')
+)
 
 # ================= PATH =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -72,5 +75,11 @@ def predict():
 
 # ================= RUN =================
 if __name__ == "__main__":
-    print("🚀 Server running (KNN Urban)...")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    import os
+    port = int(os.environ.get("PORT", 10000))
+
+    print(f"🚀 Server running on port {port}")
+    app.run(host="0.0.0.0", port=port)
+
+print("CURRENT DIR:", os.getcwd())
+print("FILES:", os.listdir())
