@@ -3,7 +3,6 @@ pandas
 scikit-learn
 matplotlib
 librosa
-tensorflow
 flask
 gunicorn
 soundfile
