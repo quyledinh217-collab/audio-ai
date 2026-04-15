@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio AI Pro - KNN</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            color: white;
+            overflow: hidden;
+        }
+
+        video.bg {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            filter: brightness(0.5);
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        video.active {
+            opacity: 1;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .card {
+            background: rgba(0,0,0,0.6);
+            padding: 30px;
+            border-radius: 20px;
+            width: 400px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 0 30px rgb(82, 158, 245);
+        }
+
+        h2 { text-align: center; }
+
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 10px;
+            border: none;
+        }
+
+        button {
+            background: #030963;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #25c3eb;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .bar {
+            height: 10px;
+            background: #ced0d2;
+            border-radius: 10px;
+            margin-top: 5px;
+        }
+
+        .fill {
+            height: 100%;
+            background: #2bdaee;
+            border-radius: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            margin-top: 10px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% {opacity: 0.2;}
+            50% {opacity: 1;}
+            100% {opacity: 0.2;}
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- VIDEO BACKGROUND -->
+<video class="bg video1 active" autoplay muted playsinline></video>
+<video class="bg video2" autoplay muted playsinline></video>
+
+<!-- NHẠC NỀN -->
+<audio id="bgMusic" autoplay loop>
+    <source src="{{ url_for('static', filename='hhh.mp3') }}">
+</audio>
+
+<div class="container">
+    <div class="card">
+        <h2>🎧 Audio AI (KNN)</h2>
+
+        <input type="file" id="fileInput" accept="audio/*">
+        <audio id="audioPlayer" controls></audio>
+
+        <button onclick="upload()">🚀 Predict</button>
+
+        <div id="loading" class="loading" style="display:none;">
+            ⏳ AI đang suy nghĩ...
+        </div>
+
+        <div id="result"></div>
+        <canvas id="waveChart" style="margin-top:20px;"></canvas>
+    </div>
+</div>
+
+<script>
+// ===== FILE SELECT =====
+let selectedFile = null;
+
+document.getElementById("fileInput").addEventListener("change", e => {
+    selectedFile = e.target.files[0];
+
+    const audioPlayer = document.getElementById("audioPlayer");
+    const resultDiv = document.getElementById("result");
+
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+    audioPlayer.src = URL.createObjectURL(selectedFile);
+
+    resultDiv.innerHTML = "";
+});
+
+// ===== UPLOAD (ONLY KNN) =====
+function upload() {
+    const resultDiv = document.getElementById("result");
+    const loading = document.getElementById("loading");
+    const btn = document.querySelector("button");
+
+    if (!selectedFile) {
+        resultDiv.innerText = "⚠️ Chưa có audio!";
+        return;
+    }
+
+    let formData = new FormData();
+    formData.append("file", selectedFile);
+
+    btn.disabled = true;
+    loading.style.display = "block";
+    resultDiv.innerHTML = "";
+
+    fetch("/predict", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        loading.style.display = "none";
+        btn.disabled = false;
+
+        if (data.error) {
+            resultDiv.innerText = "❌ " + data.error;
+            return;
+        }
+
+        let prediction = String(data.knn_prediction);
+        let confidence = data.knn_confidence || 0;
+
+        let analysis = analyzeSound(prediction);
+
+        resultDiv.innerHTML = `
+            <b>🔥 KNN Prediction: ${prediction}</b>
+
+            <div class="bar">
+                <div class="fill" style="width:${confidence*100}%"></div>
+            </div>
+            ${(confidence*100).toFixed(2)}%
+
+            <hr>
+
+            <b>${analysis.type}</b><br>
+            <i>${analysis.desc}</i><br><br>
+            <b>👉 Khuyến nghị:</b><br>
+            ${analysis.action}
+        `;
+
+        if (data.waveform) {
+            renderWaveform(data.waveform);
+        }
+    })
+    .catch(err => {
+        loading.style.display = "none";
+        btn.disabled = false;
+        resultDiv.innerText = "❌ Lỗi server!";
+        console.error(err);
+    });
+}
+
+// ===== PHÂN TÍCH ÂM THANH =====
+function analyzeSound(label) {
+    label = label.toLowerCase();
+
+    if (label.includes("siren") || label.includes("alarm"))
+        return { type:"🚨 Khẩn cấp", desc:"Âm thanh cảnh báo", action:"⚠️ Kiểm tra ngay!" };
+
+    if (label.includes("dog"))
+        return { type:"🐶 Động vật", desc:"Có vật nuôi", action:"🔍 Kiểm tra xung quanh" };
+
+    if (label.includes("drilling") || label.includes("engine"))
+        return { type:"🏗️ Công nghiệp", desc:"Máy móc hoạt động", action:"🔊 Không nguy hiểm" };
+
+    if (label.includes("gun") || label.includes("explosion"))
+        return { type:"💥 Nguy hiểm", desc:"Âm thanh nguy hiểm", action:"🚨 Rời khỏi khu vực!" };
+
+    return { type:"🔊 Bình thường", desc:"Âm thanh môi trường", action:"✅ Không cần hành động" };
+}
+
+// ===== WAVEFORM =====
+let waveChart = null;
+
+function renderWaveform(data) {
+    const ctx = document.getElementById("waveChart").getContext("2d");
+
+    if (waveChart) waveChart.destroy();
+
+    waveChart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: data.map((_, i) => i),
+            datasets: [{
+                data: data,
+                borderWidth: 1,
+                pointRadius: 0
+            }]
+        }
+    });
+}
+
+// ===== NHẠC NỀN =====
+const bgMusic = document.getElementById("bgMusic");
+bgMusic.volume = 0.5;
+
+const audioPlayer = document.getElementById("audioPlayer");
+
+audioPlayer.addEventListener("play", () => bgMusic.pause());
+audioPlayer.addEventListener("pause", () => bgMusic.play());
+audioPlayer.addEventListener("ended", () => bgMusic.play());
+
+document.body.addEventListener("click", () => {
+    bgMusic.play().catch(() => {});
+}, { once: true });
+
+// ===== VIDEO BACKGROUND =====
+const video1 = document.querySelector(".video1");
+const video2 = document.querySelector(".video2");
+
+const videoList = [
+    "{{ url_for('static', filename='iii.mp4') }}",
+    "{{ url_for('static', filename='nnn.mp4') }}",
+    "{{ url_for('static', filename='lll.mp4') }}"
+];
+
+let currentVideo = video1;
+let nextVideo = video2;
+
+function shuffleArray(array) {
+    let arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+let shuffledList = shuffleArray(videoList);
+let currentIndex = 0;
+
+function getNextVideo() {
+    if (currentIndex >= shuffledList.length) {
+        shuffledList = shuffleArray(videoList);
+        currentIndex = 0;
+    }
+    return shuffledList[currentIndex++];
+}
+
+function switchVideo() {
+    const src = getNextVideo();
+
+    nextVideo.src = src;
+    nextVideo.load();
+
+    nextVideo.onloadeddata = () => {
+        nextVideo.classList.add("active");
+        currentVideo.classList.remove("active");
+
+        nextVideo.play();
+
+        let temp = currentVideo;
+        currentVideo = nextVideo;
+        nextVideo = temp;
+
+        currentVideo.onended = switchVideo;
+    };
+}
+
+window.addEventListener("load", () => {
+    video1.src = getNextVideo();
+    video1.play();
+    video1.classList.add("active");
+
+    video1.onended = switchVideo;
+});
+</script>
+
+</body>
+</html>
