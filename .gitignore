@@ -1,0 +1,5 @@
+data/
+uploads/
+*.wav
+*.mp3
+*.zip
